@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -40,9 +41,14 @@ func main() {
 	router.HandleFunc("/users/{id}", userEndpoint.Update).Methods("PATCH")
 	router.HandleFunc("/users/{id}", userEndpoint.Delete).Methods("DELETE")
 
+	// Obtenemos el puerto a traves de la ENV, y no hardcodeado
+	port := os.Getenv("PORT")
+	// Generamos una address
+	address := fmt.Sprintf("127.0.0.1:%s", port)
+
 	srv := &http.Server{
 		Handler:      router,
-		Addr:         "127.0.0.1:8000",
+		Addr:         address,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
 	}
