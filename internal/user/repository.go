@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -10,12 +11,12 @@ import (
 )
 
 type Repository interface {
-	Create(user *domain.User) error                                                                 // Le pasamos como puntero al User
-	GetAll(filters Filters, offset int, limit int) /* Pasamos el Filtrado */ ([]domain.User, error) // El Get all, nos devuelve un array de usuarios
-	Get(id string) (*domain.User, error)                                                            // El Get by ID, nos devuelve un ID, y un puntero de User
-	Delete(id string) error
-	Update(id string, firstName *string, lastName *string, email *string, phone *string) error
-	Count(filters Filters) (int, error) // Devuelve la cantidad de registros
+	Create(ctx context.Context, user *domain.User) error                                                                 // Le pasamos como puntero al User
+	GetAll(ctx context.Context, filters Filters, offset int, limit int) /* Pasamos el Filtrado */ ([]domain.User, error) // El Get all, nos devuelve un array de usuarios
+	Get(ctx context.Context, id string) (*domain.User, error)                                                            // El Get by ID, nos devuelve un ID, y un puntero de User
+	Delete(ctx context.Context, id string) error
+	Update(ctx context.Context, id string, firstName *string, lastName *string, email *string, phone *string) error
+	Count(ctx context.Context, filters Filters) (int, error) // Devuelve la cantidad de registros
 }
 
 // Esta struct va hacer referencia a la DB de GORM
@@ -34,7 +35,7 @@ func NewRepo(log *log.Logger, db *gorm.DB) Repository {
 }
 
 // Creamos el Metodo Create
-func (repo *repo) Create(user *domain.User) error {
+func (repo *repo) Create(ctx context.Context, user *domain.User) error {
 	repo.log.Println(user) // Este loguer es el que nosotros le hemos pasado. Es lo que imprimira al pegarle al POST
 
 	/* Esto no lo usamos mas. Le quitamos la responsabilidad al Repository y lo usamos con GORM-HOOKS para crear el ID.
@@ -43,7 +44,7 @@ func (repo *repo) Create(user *domain.User) error {
 	// user.ID = uuid.New().String()
 
 	/* Tenemos que hacer del objeto  de "db" el metodo "Create", llamando a nuestra Struct (repo) que le debemos pasar la entidad del User */
-	result := repo.db.Create(user)
+	result := repo.db.WithContext(ctx).Create(user) // Aca le pasamos el Context
 
 	// Tenemos 2 tipos de manejos de error. Este en el que le decimos, que si el resultado da error, y es distinto a null que lo tire:
 
@@ -64,11 +65,11 @@ func (repo *repo) Create(user *domain.User) error {
 }
 
 // Creamo el Metodo Get All
-func (repo *repo) GetAll(filters Filters, offset, limit int) ([]domain.User, error) {
+func (repo *repo) GetAll(ctx context.Context, filters Filters, offset, limit int) ([]domain.User, error) {
 	var u []domain.User // Declaramos la variable user. Que sera un vector de usuarios
 
 	// Debemos traernos el Model del User
-	tx := repo.db.Model(u)
+	tx := repo.db.WithContext(ctx).Model(u)
 	// Nos traemos el filtrado, y se lo pasamos
 	tx = applyFilters(tx, filters)
 	// Con GORM especificamos tanto el limit & el offset
@@ -83,6 +84,8 @@ func (repo *repo) GetAll(filters Filters, offset, limit int) ([]domain.User, err
 
 	// Hanldeamos el error
 	if result.Error != nil {
+		repo.log.Println("[ERROR]-[REPOSITORY]-[GET-ALL]", result.Error)
+
 		return nil, result.Error
 	}
 
@@ -94,17 +97,15 @@ func (repo *repo) GetAll(filters Filters, offset, limit int) ([]domain.User, err
 }
 
 // Creamo el Metodo Get By ID
-func (repo *repo) Get(id string) (*domain.User, error) {
+func (repo *repo) Get(ctx context.Context, id string) (*domain.User, error) {
 	/* Primero debemos generar una estructura User para poder pasarle el ID a GORM */
 	user := domain.User{ID: id}
 
 	/* Para buscar la informacion, utilizamos el .First() con el puntero en el User.  */
-	result := repo.db.First(&user) // First es el primer elemento que encuentra
-
-	// Handleamos el error
-	if result.Error != nil {
-		return nil, result.Error
-	}
+	if err := repo.db.WithContext(ctx).First(&user).Error; err != nil {
+		repo.log.Println(err)
+		return nil, err
+	} // First es el primer elemento que encuentra
 
 	// Devolvemos al puntero del User, tanto como el nil. No se devuelve el result
 	return &user, nil
@@ -112,16 +113,14 @@ func (repo *repo) Get(id string) (*domain.User, error) {
 }
 
 // Creamos el Metodo DELETE
-func (repo *repo) Delete(id string) error {
+func (repo *repo) Delete(ctx context.Context, id string) error {
 	/* Primero debemos generar una estructura User para poder pasarle el ID a GORM */
 	user := domain.User{ID: id}
 
-	result := repo.db.Delete(&user) // El metodo que se usa es el .DELETE
-
-	// Handleamos el error
-	if result.Error != nil {
-		return result.Error
-	}
+	if err := repo.db.WithContext(ctx).Delete(&user).Error; err != nil {
+		repo.log.Println(err)
+		return err
+	} // El metodo que se usa es el .DELETE
 
 	// Devolvemos nil. No se devuelve el result
 	return nil
@@ -130,7 +129,7 @@ func (repo *repo) Delete(id string) error {
 
 // Creamos el Metodo UPDATE
 
-func (repo *repo) Update(id string, firstName *string, lastName *string, email *string, phone *string) error {
+func (repo *repo) Update(ctx context.Context, id string, firstName *string, lastName *string, email *string, phone *string) error {
 	values := make(map[string]interface{})
 
 	if firstName != nil {
@@ -149,7 +148,8 @@ func (repo *repo) Update(id string, firstName *string, lastName *string, email *
 		values["phone"] = *phone
 	}
 
-	if result := repo.db.Model(&domain.User{}).Where("id = ?", id).Updates(values); result.Error != nil {
+	if result := repo.db.WithContext(ctx).Model(&domain.User{}).Where("id = ?", id).Updates(values); result.Error != nil {
+		repo.log.Println(result)
 		return result.Error
 	}
 
@@ -173,11 +173,12 @@ func applyFilters(tx *gorm.DB, filters Filters) *gorm.DB {
 }
 
 // FUNCION PARA EL CONTADOR DEL REGISTRO
-func (repo *repo) Count(filters Filters) (int, error) {
+func (repo *repo) Count(ctx context.Context, filters Filters) (int, error) {
 	var count int64
-	tx := repo.db.Model(domain.User{})
+	tx := repo.db.WithContext(ctx).Model(domain.User{})
 	tx = applyFilters(tx, filters)
 	if err := tx.Count(&count).Error; err != nil {
+		repo.log.Println(err) // Imprimimos posiblemente los errores
 		return 0, err
 	}
 	return int(count), nil

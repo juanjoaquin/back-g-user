@@ -6,8 +6,9 @@
 package user
 
 import (
+	"context"
 	"encoding/json"
-	"net/http"
+	"errors"
 	"strconv"
 
 	"github.com/gorilla/mux"
@@ -15,8 +16,8 @@ import (
 )
 
 type (
-	// Pasamos al Controller que este recibira un ResponseWritter, y un Request, todo esto lo recibiran los endpoints
-	Controller func(w http.ResponseWriter, r *http.Request)
+	// Usamos el Endpoint de GoKit recomendable
+	Controller func(ctx context.Context, request interface{}) (response interface{}, err error)
 
 	Endpoints struct {
 		// Aqui definimos los endpoints:
@@ -88,7 +89,7 @@ func MakeEndpoints(s Service, config Config) Endpoints {
 // Estas seran una funcion privada, ya que empiezan con minuscula, porque el que vamos a usar es el de arriba
 func makeDeleteEndpoint(s Service) Controller {
 	// Definimos la funcion del Controller, que seria la que esta arriba de todo del Controller
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		// Aqui ira nuestra logica del endpoint
 
 		// Es parecido al de Get By Id.
@@ -112,45 +113,57 @@ func makeDeleteEndpoint(s Service) Controller {
 // Create Endpoint
 // Aqui tambien le pasaremos ese servicio
 func makeCreateEndpoint(s Service) Controller {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 
-		// Aca llamamos el struct que hicimos del CreateReq (que se encuentra dentro del Type)
-		var req CreateReq
+		// Asignamos el nuevo valor con el Go Kit del Request del Context
+		req := request.(CreateReq)
 
-		// Con esto inyectamos los datos que vienen del JSON a mi struct (Ej: "first_name":"Nahuel" CreateReq { FirstName: "Nahuel"})
-		// Tenemos que hacer un matcheo con lo que trajo el request. Esto lo hacemos con el package json para decodificar la Request.
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			// Con esto manejamos el error. Debemos utilizar el parametro: w http.ResponseWriter, que tenemos ahi en el param
-			w.WriteHeader(400)
-			// 6. Aca le pasamos el Error struct que hicimos previamente
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "Invalid request format"})
-			return
-		}
+		/* 		var req CreateReq // Este es el viejo req para el CreateReq*/
 
-		// Para pasarlo como Bad Request a uno de los campos, debemos hacerlo asi:
-		if req.FirstName == "" {
+		// Esto no lo usamos mas porque con el Middleware, es donde aplicamos esto. Se modifica
+
+		/* 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		   			w.WriteHeader(400)
+		   			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "Invalid request format"})
+		   			return
+		   		}
+		*/
+		// La validacion tambien se modifica. No usamos mas esta
+
+		/* 		if req.FirstName == "" {
 			w.WriteHeader(400)
 			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "First name is required"})
 			return
 		}
-
-		// Vamos a returnar la capa de Servicio que tenemos. En este caso sería: s.Create() con el Body que le habiamos pasado.
-		user, err := s.Create(req.FirstName, req.LastName, req.Phone, req.Email)
-		if err != nil {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: err.Error()})
+		*/
+		//Esta es el nuevo tipo de validacion que se va a utilizar
+		if req.FirstName == "" {
+			return nil, errors.New("First Name is required")
 		}
 
-		json.NewEncoder(w).Encode(&Response{Status: 201, Data: user})
+		if req.LastName == "" {
+			return nil, errors.New("Last Name is required")
+		}
+
+		user, err := s.Create(ctx, req.FirstName, req.LastName, req.Phone, req.Email) // Le pasamos el Context (ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		// Y aqui no lo usamos mas.
+		/* 		json.NewEncoder(w).Encode(&Response{Status: 201, Data: user}) */
+
+		// Debemos hacer un return de la interface
+		return user, nil
 	}
 }
 
 // Get All Endpoint
 func makeGetAllEndpoint(s Service, config Config) Controller {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 
 		//Para obtener el Query Params
-		v := r.URL.Query()
+		v := re.URL.Query()
 		// Nos traemos el SearchParams, la Struct del Service.
 		filters := Filters{
 			FirstName: v.Get("first_name"),
@@ -192,7 +205,7 @@ func makeGetAllEndpoint(s Service, config Config) Controller {
 
 // Get by id endpoint
 func makeGetEndpoint(s Service) Controller {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 
 		// Se debe crear una variable y guardar el ID como parametro
 
@@ -214,7 +227,7 @@ func makeGetEndpoint(s Service) Controller {
 
 // Update endpoint
 func makeUpdateEndpoint(s Service) Controller {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 
 		// Llamamos a la struct que creamos previamente
 		var req UpdateReq
