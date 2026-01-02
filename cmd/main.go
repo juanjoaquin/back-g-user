@@ -37,7 +37,7 @@ func main() {
 	router.HandleFunc("/users", userEndpoint.GetAll).Methods("GET")
 	router.HandleFunc("/users/{id}", userEndpoint.Get).Methods("GET") // La rutas dinamicas se usan con /{"Nombre de lo que deseamos dinamico"}
 
-	router.HandleFunc("/users", userEndpoint.Create).Methods("POST")
+	// router.HandleFunc("/users", userEndpoint.Create).Methods("POST")
 	router.HandleFunc("/users/{id}", userEndpoint.Update).Methods("PATCH")
 	router.HandleFunc("/users/{id}", userEndpoint.Delete).Methods("DELETE")
 
