@@ -8,7 +8,6 @@ package user
 import (
 	"context"
 	"encoding/json"
-	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/juanjoaquin/back-g-meta/pkg/meta"
@@ -40,6 +39,16 @@ type (
 		Phone     string `json:"phone"`
 	}
 
+	GetReq struct {
+		ID string
+	}
+
+	GetAllReq struct {
+		FirstName string
+		LastName  string
+		Limit     int
+		Page      int
+	}
 	/*
 		5. Vamos a generar un struct para los errores de las response:
 		DEPRECADO
@@ -161,67 +170,70 @@ func makeCreateEndpoint(s Service) Controller {
 
 // Get All Endpoint
 func makeGetAllEndpoint(s Service, config Config) Controller {
-	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+
+		// NUEVO: Llamamos al Request de la Struct con el Package
+		req := request.(GetAllReq)
 
 		//Para obtener el Query Params
-		v := re.URL.Query()
+		// v := re.URL.Query()
+
 		// Nos traemos el SearchParams, la Struct del Service.
 		filters := Filters{
-			FirstName: v.Get("first_name"),
-			LastName:  v.Get("last_name"),
+			FirstName: req.FirstName,
+			LastName:  req.LastName,
 		}
 
 		// Nos traemos el Limit y el Page desde las ENV.
-		limit, _ := strconv.Atoi(v.Get("limit"))
-		page, _ := strconv.Atoi(v.Get("page"))
+		/* 	limit, _ := strconv.Atoi(v.Get("limit"))
+		page, _ := strconv.Atoi(v.Get("page")) */
 
 		// Aqui aplicamos el Counter que hicimos despues de todo esto
-		count, err := s.Count(filters)
+		count, err := s.Count(ctx, filters)
 		if err != nil {
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(&Response{Status: 500, Err: err.Error()})
-			return
+			return nil, response.InternalServerError(err.Error())
 		}
 		// Nos traemos el Package de Meta de la función New del propio package
-		meta, err := meta.New(page, limit, count, config.LimPageDef) // Le debemos pasar tanto Page & Limit
+		meta, err := meta.New(req.Page, req.Limit, count, config.LimPageDef) // Le debemos pasar tanto Page & Limit
+
 		if err != nil {
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(&Response{Status: 500, Err: err.Error()})
-			return
+			return nil, response.InternalServerError(err.Error())
+
 		}
 
 		// Debemos hacer referencia al GetAll del Service
-		users, err := s.GetAll(filters, meta.Offset(), meta.Limit()) // Pasamos el filtro al GetAll del Service. Y tambien el Meta de Offset y Limit
+		users, err := s.GetAll(ctx, filters, meta.Offset(), meta.Limit()) // Pasamos el filtro al GetAll del Service. Y tambien el Meta de Offset y Limit
 
 		// Si el error es != nill, manejamos con el w.WirteHeader la Bad Request
 		if err != nil {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: err.Error()})
-			return
+			return nil, response.InternalServerError(err.Error())
+
 		}
 		// Lo devolvemos con la nueva struct de Response & Devolvemos el package de Meta (previamente traido arriba)
-		json.NewEncoder(w).Encode(&Response{Status: 200, Data: users, Meta: meta})
+		return response.OK("success", users, nil), nil
 	}
 }
 
 // Get by id endpoint
 func makeGetEndpoint(s Service) Controller {
-	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
 
 		// Se debe crear una variable y guardar el ID como parametro
 
 		//Gorilla Max con Vars le pasamos nuestra request, y esta nos devuelve un path con los parametros
-		path := mux.Vars(r)    // Aqui llamamos a mux (Gorilla Mux),Vars(r) / La r es el http.Request como parametro que tenemos
-		id := path["id"]       // Especificamos que queremos el ID
-		user, err := s.Get(id) // Declaramos al user, y llamamos al service ( s.Get() )
+		// path := mux.Vars(r)    // Aqui llamamos a mux (Gorilla Mux),Vars(r) / La r es el http.Request como parametro que tenemos
+		// id := path["id"]       // Especificamos que queremos el ID
+
+		// NUEVO: Hay que hacer un Request de la Capa anterior de los Request
+		req := request.(GetReq)
+
+		user, err := s.Get(ctx, req.ID) // Declaramos al user, y llamamos al service ( s.Get() )
 
 		if err != nil {
-			w.WriteHeader(404)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "Usuario no encontrado"})
-			return
+			return nil, response.NotFound(err.Error())
 		}
 
-		json.NewEncoder(w).Encode(&Response{Status: 200, Data: user})
+		return response.OK("success", user, nil), nil
 
 	}
 }
