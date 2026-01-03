@@ -7,6 +7,7 @@ package user
 
 import (
 	"context"
+	"errors"
 
 	"github.com/juanjoaquin/back-g-meta/pkg/meta"
 	"github.com/juanjoaquin/back-g-response/response"
@@ -117,8 +118,8 @@ func makeDeleteEndpoint(s Service) Controller {
 		err := s.Delete(ctx, req.ID)
 		// Nos traemos el service.Delete y handleamos el error (CON LA NUEVA STRUCT)
 		if err != nil {
-			if err == ErrUserNotFound {
-				return nil, response.NotFound(ErrUserNotFound.Error())
+			if errors.As(err, &ErrUserNotFound{}) {
+				return nil, response.NotFound(err.Error())
 			}
 			return nil, response.InternalServerError(err.Error())
 
@@ -239,7 +240,10 @@ func makeGetEndpoint(s Service) Controller {
 		user, err := s.Get(ctx, req.ID) // Declaramos al user, y llamamos al service ( s.Get() )
 
 		if err != nil {
-			return nil, response.NotFound(err.Error())
+			if errors.As(err, &ErrUserNotFound{}) {
+				return nil, response.NotFound(err.Error())
+			}
+			return nil, response.InternalServerError(err.Error())
 		}
 
 		return response.OK("success", user, nil), nil
@@ -281,12 +285,10 @@ func makeUpdateEndpoint(s Service) Controller {
 		// Vamos a returnar la capa de Servicio que tenemos. Pasandole el ID. En este caso sería: s.Update() con el Body que le habiamos pasado.
 		if err != nil {
 
-			if err == ErrUserNotFound {
-				return nil, response.NotFound(ErrUserNotFound.Error())
+			if errors.As(err, &ErrUserNotFound{}) {
+				return nil, response.NotFound(err.Error())
 			}
-
 			return nil, response.InternalServerError(err.Error())
-
 		}
 
 		return response.OK("success", nil, nil), nil

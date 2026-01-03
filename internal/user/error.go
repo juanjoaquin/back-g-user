@@ -1,10 +1,20 @@
 package user
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // Este archivo son los errores customizados para los campos. Por ejemplo: First Name, Last Name del User, etc...
 
 var ErrFirstNameRequired = errors.New("First Name is required")
 var ErrLastNameRequired = errors.New("Last Name is required")
 
-var ErrUserNotFound = errors.New("User not found")
+// Manejo de Errores con Parametros Dinamicos
+type ErrUserNotFound struct {
+	UserID string
+}
+
+func (e ErrUserNotFound) Error() string {
+	return fmt.Sprintf("user '%s' doesnt exists", e.UserID)
+}
