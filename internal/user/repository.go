@@ -104,7 +104,10 @@ func (repo *repo) Get(ctx context.Context, id string) (*domain.User, error) {
 	/* Para buscar la informacion, utilizamos el .First() con el puntero en el User.  */
 	if err := repo.db.WithContext(ctx).First(&user).Error; err != nil {
 		repo.log.Println(err)
-		return nil, err
+		if err == gorm.ErrRecordNotFound {
+			return nil, ErrUserNotFound{id}
+		}
+		return nil, ErrUserNotFound{id}
 	} // First es el primer elemento que encuentra
 
 	// Devolvemos al puntero del User, tanto como el nil. No se devuelve el result
@@ -129,7 +132,7 @@ func (repo *repo) Delete(ctx context.Context, id string) error {
 	// Esto se usa solo con RESULT. En caso de que venga con Rows = 0. Lanzamos el mensaje del error.
 	if result.RowsAffected == 0 {
 		repo.log.Printf("user %s doesnt exists", id)
-		return fmt.Errorf("User not exists")
+		return ErrUserNotFound{id}
 	}
 
 	// Devolvemos nil. No se devuelve el result
@@ -167,7 +170,7 @@ func (repo *repo) Update(ctx context.Context, id string, firstName *string, last
 	// Esto se usa solo con RESULT. En caso de que venga con Rows = 0. Lanzamos el mensaje del error.
 	if result.RowsAffected == 0 {
 		repo.log.Printf("user %s doesnt exists", id)
-		return fmt.Errorf("User not exists")
+		return ErrUserNotFound{id}
 	}
 
 	return nil
