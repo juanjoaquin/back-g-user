@@ -22,6 +22,8 @@ github.com/juanjoaquin/back-g-domain v0.0.1 h1:0lQ919OYSCKIqWSPVR+jHN9Ulfa0c1BBu
 github.com/juanjoaquin/back-g-domain v0.0.1/go.mod h1:GwR3EaBzQnsOUEitia0V//yEm2/i6EwfEdY2AihrCqU=
 github.com/juanjoaquin/back-g-meta v0.0.0-20251228234920-84530c134b90 h1:fQws7JvKcKSbtFgmpwr/g5Pad1pG/VZbOkG2tB0skW8=
 github.com/juanjoaquin/back-g-meta v0.0.0-20251228234920-84530c134b90/go.mod h1:5cZR41JyA9oZvOWKD7sCMavpjv2dtDrQEZlw5/B0CWM=
+github.com/juanjoaquin/back-g-response v0.0.1 h1:QgLEBfIce6MBgUkRCDx4Y/KoOqsQqCqA0rOaQsB3qcA=
+github.com/juanjoaquin/back-g-response v0.0.1/go.mod h1:2LSsA4XBfdptrU27dAPzfTsOA08I9EnDhiJ59kDqgcM=
 golang.org/x/text v0.20.0 h1:gK/Kv2otX8gz+wn7Rmb3vT96ZwuoxnQlY+HlJVj7Qug=
 golang.org/x/text v0.20.0/go.mod h1:D4IsuqiFMhST5bX19pQ9ikHC2GsaKyk/oF+pn3ducp4=
 gorm.io/driver/mysql v1.6.0 h1:eNbLmNTpPpTOVZi8MMxCi2aaIm0ZpInbORNXDwyLGvg=

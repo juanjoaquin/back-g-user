@@ -8,16 +8,16 @@ package user
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/juanjoaquin/back-g-meta/pkg/meta"
+	"github.com/juanjoaquin/back-g-response/response"
 )
 
 type (
 	// Usamos el Endpoint de GoKit recomendable
-	Controller func(ctx context.Context, request interface{}) (response interface{}, err error)
+	Controller func(ctx context.Context, request interface{}) (interface{}, error)
 
 	Endpoints struct {
 		// Aqui definimos los endpoints:
@@ -113,7 +113,7 @@ func makeDeleteEndpoint(s Service) Controller {
 // Create Endpoint
 // Aqui tambien le pasaremos ese servicio
 func makeCreateEndpoint(s Service) Controller {
-	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
 
 		// Asignamos el nuevo valor con el Go Kit del Request del Context
 		req := request.(CreateReq)
@@ -136,25 +136,26 @@ func makeCreateEndpoint(s Service) Controller {
 			return
 		}
 		*/
-		//Esta es el nuevo tipo de validacion que se va a utilizar
+
+		//Esta es el nuevo tipo de validacion con nuestro Package. Especificamos cual es el tipo de error
 		if req.FirstName == "" {
-			return nil, errors.New("First Name is required")
+			return nil, response.BadRequest("first name is required")
 		}
 
 		if req.LastName == "" {
-			return nil, errors.New("Last Name is required")
+			return nil, response.BadRequest("Last name is required")
 		}
 
 		user, err := s.Create(ctx, req.FirstName, req.LastName, req.Phone, req.Email) // Le pasamos el Context (ctx)
 		if err != nil {
-			return nil, err
+			return nil, response.InternalServerError(err.Error())
 		}
 
 		// Y aqui no lo usamos mas.
 		/* 		json.NewEncoder(w).Encode(&Response{Status: 201, Data: user}) */
 
-		// Debemos hacer un return de la interface
-		return user, nil
+		// Debemos hacer un return de nuestro Package de Response
+		return response.Created("success", user, nil), nil
 	}
 }
 

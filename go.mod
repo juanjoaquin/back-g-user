@@ -13,6 +13,7 @@ require (
 require (
 	github.com/go-kit/log v0.2.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
+	github.com/juanjoaquin/back-g-response v0.0.1 // indirect
 )
 
 require (

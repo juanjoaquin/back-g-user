@@ -10,6 +10,7 @@ import (
 	"github.com/go-kit/kit/endpoint"
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
+	"github.com/juanjoaquin/back-g-response/response"
 	"github.com/juanjoaquin/back-g-user/internal/user"
 )
 
@@ -49,7 +50,9 @@ func decodeCreateUser(_ context.Context, r *http.Request) (interface{}, error) {
 // Hacemos un Enconde del Response.
 // Esto lo que va a devolver despues el Endpoint una vez que retorne
 func encodeResponse(ctx context.Context, w http.ResponseWriter, resp interface{}) error {
+	// Hacemos un reconverse de nuestro Package de Response
+	r := resp.(response.Response)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(200)
-	return json.NewEncoder(w).Encode(resp)
+	w.WriteHeader(r.StatusCode())       // Esto tambien
+	return json.NewEncoder(w).Encode(r) // Retornamos el response
 }
