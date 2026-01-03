@@ -114,8 +114,12 @@ func makeDeleteEndpoint(s Service) Controller {
 
 		req := request.(DeleteReq)
 
+		err := s.Delete(ctx, req.ID)
 		// Nos traemos el service.Delete y handleamos el error (CON LA NUEVA STRUCT)
-		if err := s.Delete(ctx, req.ID); err != nil {
+		if err != nil {
+			if err == ErrUserNotFound {
+				return nil, response.NotFound(ErrUserNotFound.Error())
+			}
 			return nil, response.InternalServerError(err.Error())
 
 		}
@@ -153,11 +157,11 @@ func makeCreateEndpoint(s Service) Controller {
 
 		//Esta es el nuevo tipo de validacion con nuestro Package. Especificamos cual es el tipo de error
 		if req.FirstName == "" {
-			return nil, response.BadRequest("first name is required")
+			return nil, response.BadRequest(ErrFirstNameRequired.Error()) // Le pasamos el nuevo error.go junto al Package de Response
 		}
 
 		if req.LastName == "" {
-			return nil, response.BadRequest("Last name is required")
+			return nil, response.BadRequest(ErrLastNameRequired.Error())
 		}
 
 		user, err := s.Create(ctx, req.FirstName, req.LastName, req.Phone, req.Email) // Le pasamos el Context (ctx)
@@ -260,21 +264,11 @@ func makeUpdateEndpoint(s Service) Controller {
 
 		// Validamos los campos y si viene vacio
 		if req.FirstName != nil && *req.FirstName == "" {
-			return nil, response.BadRequest("First Name is required")
+			return nil, response.BadRequest(ErrFirstNameRequired.Error())
 		}
 
 		if req.LastName != nil && *req.LastName == "" {
-			return nil, response.BadRequest("Last Name is required")
-
-		}
-
-		if req.Email != nil && *req.Email == "" {
-			return nil, response.BadRequest("Email is required")
-
-		}
-
-		if req.Phone != nil && *req.Phone == "" {
-			return nil, response.BadRequest("Phone is required")
+			return nil, response.BadRequest(ErrLastNameRequired.Error())
 
 		}
 
@@ -283,9 +277,15 @@ func makeUpdateEndpoint(s Service) Controller {
 		/* 		path := mux.Vars(r)
 		   		id := path["id"] */
 
+		err := s.Update(ctx, req.ID, req.FirstName, req.LastName, req.Email, req.Phone)
 		// Vamos a returnar la capa de Servicio que tenemos. Pasandole el ID. En este caso sería: s.Update() con el Body que le habiamos pasado.
-		if err := s.Update(ctx, req.ID, req.FirstName, req.LastName, req.Email, req.Phone); err != nil {
-			return nil, response.NotFound("Usuario no encontrado")
+		if err != nil {
+
+			if err == ErrUserNotFound {
+				return nil, response.NotFound(ErrUserNotFound.Error())
+			}
+
+			return nil, response.InternalServerError(err.Error())
 
 		}
 
