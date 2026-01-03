@@ -104,6 +104,9 @@ func (repo *repo) Get(ctx context.Context, id string) (*domain.User, error) {
 	/* Para buscar la informacion, utilizamos el .First() con el puntero en el User.  */
 	if err := repo.db.WithContext(ctx).First(&user).Error; err != nil {
 		repo.log.Println(err)
+		if err == gorm.ErrRecordNotFound {
+			return nil, ErrUserNotFound{id}
+		}
 		return nil, ErrUserNotFound{id}
 	} // First es el primer elemento que encuentra
 
