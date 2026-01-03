@@ -117,10 +117,20 @@ func (repo *repo) Delete(ctx context.Context, id string) error {
 	/* Primero debemos generar una estructura User para poder pasarle el ID a GORM */
 	user := domain.User{ID: id}
 
-	if err := repo.db.WithContext(ctx).Delete(&user).Error; err != nil {
-		repo.log.Println(err)
-		return err
-	} // El metodo que se usa es el .DELETE
+	result := repo.db.WithContext(ctx).Delete(&user)
+
+	// El metodo que se usa es el .DELETE
+
+	if result.Error != nil {
+		repo.log.Println(result.Error)
+		return result.Error
+	}
+
+	// Esto se usa solo con RESULT. En caso de que venga con Rows = 0. Lanzamos el mensaje del error.
+	if result.RowsAffected == 0 {
+		repo.log.Printf("user %s doesnt exists", id)
+		return fmt.Errorf("User not exists")
+	}
 
 	// Devolvemos nil. No se devuelve el result
 	return nil
@@ -147,10 +157,17 @@ func (repo *repo) Update(ctx context.Context, id string, firstName *string, last
 	if phone != nil {
 		values["phone"] = *phone
 	}
+	result := repo.db.WithContext(ctx).Model(&domain.User{}).Where("id = ?", id).Updates(values)
 
-	if result := repo.db.WithContext(ctx).Model(&domain.User{}).Where("id = ?", id).Updates(values); result.Error != nil {
-		repo.log.Println(result)
+	if result.Error != nil {
+		repo.log.Println(result.Error)
 		return result.Error
+	}
+
+	// Esto se usa solo con RESULT. En caso de que venga con Rows = 0. Lanzamos el mensaje del error.
+	if result.RowsAffected == 0 {
+		repo.log.Printf("user %s doesnt exists", id)
+		return fmt.Errorf("User not exists")
 	}
 
 	return nil

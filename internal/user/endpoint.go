@@ -7,9 +7,7 @@ package user
 
 import (
 	"context"
-	"encoding/json"
 
-	"github.com/gorilla/mux"
 	"github.com/juanjoaquin/back-g-meta/pkg/meta"
 	"github.com/juanjoaquin/back-g-response/response"
 )
@@ -43,6 +41,10 @@ type (
 		ID string
 	}
 
+	DeleteReq struct {
+		ID string
+	}
+
 	GetAllReq struct {
 		FirstName string
 		LastName  string
@@ -60,6 +62,7 @@ type (
 	/* Nueva Struct  para el UPDATE */
 
 	UpdateReq struct {
+		ID        string
 		FirstName *string `json:"first_name"`
 		LastName  *string `json:"last_name"`
 		Email     *string `json:"email"`
@@ -98,24 +101,26 @@ func MakeEndpoints(s Service, config Config) Endpoints {
 // Estas seran una funcion privada, ya que empiezan con minuscula, porque el que vamos a usar es el de arriba
 func makeDeleteEndpoint(s Service) Controller {
 	// Definimos la funcion del Controller, que seria la que esta arriba de todo del Controller
-	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		// Aqui ira nuestra logica del endpoint
 
 		// Es parecido al de Get By Id.
 
+		/* ESTO PASA SER MANEJADO POR EL HANDLER */
 		// Usamos el path de Gorilla Mux
-		path := mux.Vars(r)
+		// path := mux.Vars(r)
 		// Le pasamos el id
-		id := path["id"]
+		// id := path["id"]
+
+		req := request.(DeleteReq)
 
 		// Nos traemos el service.Delete y handleamos el error (CON LA NUEVA STRUCT)
-		if err := s.Delete(id); err != nil {
-			w.WriteHeader(404)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "Error al borrar el usuario"})
-			return
+		if err := s.Delete(ctx, req.ID); err != nil {
+			return nil, response.InternalServerError(err.Error())
+
 		}
 
-		json.NewEncoder(w).Encode(map[string]string{"data": "success"})
+		return response.OK("success", nil, nil), nil
 	}
 }
 
@@ -240,54 +245,51 @@ func makeGetEndpoint(s Service) Controller {
 
 // Update endpoint
 func makeUpdateEndpoint(s Service) Controller {
-	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
 
 		// Llamamos a la struct que creamos previamente
-		var req UpdateReq
+		req := request.(UpdateReq)
 
+		// ESTO SE ENCARGARA EL DECODE
 		// Decodificamos el body y lo validamos
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		/* 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			w.WriteHeader(400)
 			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "Invalid request ofrmat"})
 			return
-		}
+		} */
 
 		// Validamos los campos y si viene vacio
 		if req.FirstName != nil && *req.FirstName == "" {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "First name is required"})
-			return
+			return nil, response.BadRequest("First Name is required")
 		}
 
 		if req.LastName != nil && *req.LastName == "" {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "Last name is required"})
-			return
+			return nil, response.BadRequest("Last Name is required")
+
 		}
 
 		if req.Email != nil && *req.Email == "" {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "Email is required"})
-			return
+			return nil, response.BadRequest("Email is required")
+
 		}
 
 		if req.Phone != nil && *req.Phone == "" {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "Phone is required"})
-			return
+			return nil, response.BadRequest("Phone is required")
+
 		}
 
+		//ESTO SE ENCARGARA EL HANDLER
 		// Y aca debemos hacer lo del Gorilla Mux
-		path := mux.Vars(r)
-		id := path["id"]
+		/* 		path := mux.Vars(r)
+		   		id := path["id"] */
 
 		// Vamos a returnar la capa de Servicio que tenemos. Pasandole el ID. En este caso sería: s.Update() con el Body que le habiamos pasado.
-		if err := s.Update(id, req.FirstName, req.LastName, req.Email, req.Phone); err != nil {
-			w.WriteHeader(404)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "User dosent exists"})
-			return
+		if err := s.Update(ctx, req.ID, req.FirstName, req.LastName, req.Email, req.Phone); err != nil {
+			return nil, response.NotFound("Usuario no encontrado")
+
 		}
 
-		json.NewEncoder(w).Encode(&Response{Status: 200, Data: "User updated succesfully"})
+		return response.OK("success", nil, nil), nil
+
 	}
 }

@@ -54,6 +54,21 @@ func NewUserHTTPServer(ctx context.Context, endpoints user.Endpoints) http.Handl
 		encodeResponse,
 		opts...,
 	)).Methods("GET")
+
+	router.Handle("/users/{id}", httptransport.NewServer(
+		endpoint.Endpoint(endpoints.Update),
+		decodeUpdateUser,
+		encodeResponse,
+		opts...,
+	)).Methods("PATCH")
+
+	router.Handle("/users/{id}", httptransport.NewServer(
+		endpoint.Endpoint(endpoints.Delete),
+		decodeDeleteUser,
+		encodeResponse,
+		opts...,
+	)).Methods("DELETE")
+
 	return router
 }
 
@@ -85,6 +100,27 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 	w.WriteHeader(resp.StatusCode())
 	_ = json.NewEncoder(w).Encode(resp) // No debemos hacer un return. Solo mapearle al response que recibimos por parametro, lo que queremos retornar al cliente
 
+}
+
+func decodeUpdateUser(_ context.Context, r *http.Request) (interface{}, error) {
+	var req user.UpdateReq
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return nil, response.BadRequest(fmt.Sprintf("invalid request format '%v'", err.Error()))
+	}
+	path := mux.Vars(r)
+	req.ID = path["id"]
+	return req, nil
+
+}
+
+func decodeDeleteUser(_ context.Context, r *http.Request) (interface{}, error) {
+	path := mux.Vars(r)
+	req := user.DeleteReq{
+		ID: path["id"],
+	}
+
+	return req, nil
 }
 
 func decodeGetUser(_ context.Context, r *http.Request) (interface{}, error) {
