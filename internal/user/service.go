@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"log"
 
 	"github.com/juanjoaquin/back-g-domain/domain"
@@ -10,12 +11,12 @@ import (
 type Service interface {
 	/* 	1. Vamos a definirle los metodos de los Endpoints que fuimos utilizando.
 	   	Le pasaremos tambien los elementos del body del Create por ejemplo */
-	Create(firstName, lastName, email, phone string) (*domain.User, error)
-	GetAll(filters Filters, offset, limit int) /* Pasamos el Filtrado de params */ ([]domain.User, error) // Get All
-	Get(id string) (*domain.User, error)                                                                  // Get by User ID
-	Delete(id string) error
-	Update(id string, firstName *string, lastName *string, email *string, phone *string) error
-	Count(filters Filters) (int, error)
+	Create(ctx context.Context, firstName, lastName, email, phone string) (*domain.User, error)
+	GetAll(ctx context.Context, filters Filters, offset, limit int) /* Pasamos el Filtrado de params */ ([]domain.User, error) // Get All
+	Get(ctx context.Context, id string) (*domain.User, error)                                                                  // Get by User ID
+	Delete(ctx context.Context, id string) error
+	Update(ctx context.Context, id string, firstName *string, lastName *string, email *string, phone *string) error
+	Count(ctx context.Context, filters Filters) (int, error)
 }
 
 // Struct de Filter params:
@@ -43,7 +44,7 @@ func NewService(log *log.Logger, repo Repository) Service {
 }
 
 /* 4. Vamos a generar un metodo, que esto se lo deberemos pasar a la funcion de NewService. */
-func (s service) Create(firstName, lastName, email, phone string) (*domain.User, error) {
+func (s service) Create(ctx context.Context, firstName, lastName, email, phone string) (*domain.User, error) {
 
 	s.log.Println("Create user service")
 
@@ -58,7 +59,7 @@ func (s service) Create(firstName, lastName, email, phone string) (*domain.User,
 
 	/* Una vez pasado el repo, dentro de nuestro create. Debemos pasarle el repository. Debemos ejecutar el metodo Create del propio Repo */
 	/* Una vez creado el User en el Repositorio, debemos hacer una validacion de que si el Repo da error, este service lo handlea */
-	if err := s.repo.Create(&user); err != nil {
+	if err := s.repo.Create(ctx, &user); err != nil { // Le debemos pasar el contexto a la capa de Servicio
 		return nil, err
 	}
 
@@ -66,10 +67,10 @@ func (s service) Create(firstName, lastName, email, phone string) (*domain.User,
 }
 
 /* Get All de los Users */
-func (s service) GetAll(filters Filters, offset, limit int) /* Pasamos el Search Params */ ([]domain.User, error) {
+func (s service) GetAll(ctx context.Context, filters Filters, offset, limit int) /* Pasamos el Search Params */ ([]domain.User, error) {
 
 	/* Traemos a los Users y usamos nos traemos el .GetAll() de la Interface del Service (s.repo), que previamente declaramos en nuestro Repository (GetAll) */
-	users, err := s.repo.GetAll(filters, offset, limit) // Tambien le pasamos el Search Params
+	users, err := s.repo.GetAll(ctx, filters, offset, limit) // Tambien le pasamos el Search Params Y el
 
 	// Handleo error
 	if err != nil {
@@ -81,8 +82,8 @@ func (s service) GetAll(filters Filters, offset, limit int) /* Pasamos el Search
 
 }
 
-func (s service) Get(id string) (*domain.User, error) {
-	user, err := s.repo.Get(id)
+func (s service) Get(ctx context.Context, id string) (*domain.User, error) {
+	user, err := s.repo.Get(ctx, id)
 
 	// Handleo error
 	if err != nil {
@@ -93,15 +94,15 @@ func (s service) Get(id string) (*domain.User, error) {
 
 }
 
-func (s service) Delete(id string) error {
-	return s.repo.Delete(id)
+func (s service) Delete(ctx context.Context, id string) error {
+	return s.repo.Delete(ctx, id)
 }
 
-func (s service) Update(id string, firstName *string, lastName *string, email *string, phone *string) error {
-	return s.repo.Update(id, firstName, lastName, email, phone)
+func (s service) Update(ctx context.Context, id string, firstName *string, lastName *string, email *string, phone *string) error {
+	return s.repo.Update(ctx, id, firstName, lastName, email, phone)
 }
 
 // Pasamos el Count en el Service
-func (s service) Count(filters Filters) (int, error) {
-	return s.repo.Count(filters)
+func (s service) Count(ctx context.Context, filters Filters) (int, error) {
+	return s.repo.Count(ctx, filters)
 }

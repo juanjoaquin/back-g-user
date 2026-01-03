@@ -6,17 +6,15 @@
 package user
 
 import (
-	"encoding/json"
-	"net/http"
-	"strconv"
+	"context"
 
-	"github.com/gorilla/mux"
 	"github.com/juanjoaquin/back-g-meta/pkg/meta"
+	"github.com/juanjoaquin/back-g-response/response"
 )
 
 type (
-	// Pasamos al Controller que este recibira un ResponseWritter, y un Request, todo esto lo recibiran los endpoints
-	Controller func(w http.ResponseWriter, r *http.Request)
+	// Usamos el Endpoint de GoKit recomendable
+	Controller func(ctx context.Context, request interface{}) (interface{}, error)
 
 	Endpoints struct {
 		// Aqui definimos los endpoints:
@@ -39,6 +37,20 @@ type (
 		Phone     string `json:"phone"`
 	}
 
+	GetReq struct {
+		ID string
+	}
+
+	DeleteReq struct {
+		ID string
+	}
+
+	GetAllReq struct {
+		FirstName string
+		LastName  string
+		Limit     int
+		Page      int
+	}
 	/*
 		5. Vamos a generar un struct para los errores de las response:
 		DEPRECADO
@@ -50,6 +62,7 @@ type (
 	/* Nueva Struct  para el UPDATE */
 
 	UpdateReq struct {
+		ID        string
 		FirstName *string `json:"first_name"`
 		LastName  *string `json:"last_name"`
 		Email     *string `json:"email"`
@@ -88,180 +101,195 @@ func MakeEndpoints(s Service, config Config) Endpoints {
 // Estas seran una funcion privada, ya que empiezan con minuscula, porque el que vamos a usar es el de arriba
 func makeDeleteEndpoint(s Service) Controller {
 	// Definimos la funcion del Controller, que seria la que esta arriba de todo del Controller
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		// Aqui ira nuestra logica del endpoint
 
 		// Es parecido al de Get By Id.
 
+		/* ESTO PASA SER MANEJADO POR EL HANDLER */
 		// Usamos el path de Gorilla Mux
-		path := mux.Vars(r)
+		// path := mux.Vars(r)
 		// Le pasamos el id
-		id := path["id"]
+		// id := path["id"]
+
+		req := request.(DeleteReq)
 
 		// Nos traemos el service.Delete y handleamos el error (CON LA NUEVA STRUCT)
-		if err := s.Delete(id); err != nil {
-			w.WriteHeader(404)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "Error al borrar el usuario"})
-			return
+		if err := s.Delete(ctx, req.ID); err != nil {
+			return nil, response.InternalServerError(err.Error())
+
 		}
 
-		json.NewEncoder(w).Encode(map[string]string{"data": "success"})
+		return response.OK("success", nil, nil), nil
 	}
 }
 
 // Create Endpoint
 // Aqui tambien le pasaremos ese servicio
 func makeCreateEndpoint(s Service) Controller {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
 
-		// Aca llamamos el struct que hicimos del CreateReq (que se encuentra dentro del Type)
-		var req CreateReq
+		// Asignamos el nuevo valor con el Go Kit del Request del Context
+		req := request.(CreateReq)
 
-		// Con esto inyectamos los datos que vienen del JSON a mi struct (Ej: "first_name":"Nahuel" CreateReq { FirstName: "Nahuel"})
-		// Tenemos que hacer un matcheo con lo que trajo el request. Esto lo hacemos con el package json para decodificar la Request.
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			// Con esto manejamos el error. Debemos utilizar el parametro: w http.ResponseWriter, que tenemos ahi en el param
-			w.WriteHeader(400)
-			// 6. Aca le pasamos el Error struct que hicimos previamente
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "Invalid request format"})
-			return
-		}
+		/* 		var req CreateReq // Este es el viejo req para el CreateReq*/
 
-		// Para pasarlo como Bad Request a uno de los campos, debemos hacerlo asi:
-		if req.FirstName == "" {
+		// Esto no lo usamos mas porque con el Middleware, es donde aplicamos esto. Se modifica
+
+		/* 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		   			w.WriteHeader(400)
+		   			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "Invalid request format"})
+		   			return
+		   		}
+		*/
+		// La validacion tambien se modifica. No usamos mas esta
+
+		/* 		if req.FirstName == "" {
 			w.WriteHeader(400)
 			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "First name is required"})
 			return
 		}
+		*/
 
-		// Vamos a returnar la capa de Servicio que tenemos. En este caso sería: s.Create() con el Body que le habiamos pasado.
-		user, err := s.Create(req.FirstName, req.LastName, req.Phone, req.Email)
-		if err != nil {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: err.Error()})
+		//Esta es el nuevo tipo de validacion con nuestro Package. Especificamos cual es el tipo de error
+		if req.FirstName == "" {
+			return nil, response.BadRequest("first name is required")
 		}
 
-		json.NewEncoder(w).Encode(&Response{Status: 201, Data: user})
+		if req.LastName == "" {
+			return nil, response.BadRequest("Last name is required")
+		}
+
+		user, err := s.Create(ctx, req.FirstName, req.LastName, req.Phone, req.Email) // Le pasamos el Context (ctx)
+		if err != nil {
+			return nil, response.InternalServerError(err.Error())
+		}
+
+		// Y aqui no lo usamos mas.
+		/* 		json.NewEncoder(w).Encode(&Response{Status: 201, Data: user}) */
+
+		// Debemos hacer un return de nuestro Package de Response
+		return response.Created("success", user, nil), nil
 	}
 }
 
 // Get All Endpoint
 func makeGetAllEndpoint(s Service, config Config) Controller {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+
+		// NUEVO: Llamamos al Request de la Struct con el Package
+		req := request.(GetAllReq)
 
 		//Para obtener el Query Params
-		v := r.URL.Query()
+		// v := re.URL.Query()
+
 		// Nos traemos el SearchParams, la Struct del Service.
 		filters := Filters{
-			FirstName: v.Get("first_name"),
-			LastName:  v.Get("last_name"),
+			FirstName: req.FirstName,
+			LastName:  req.LastName,
 		}
 
 		// Nos traemos el Limit y el Page desde las ENV.
-		limit, _ := strconv.Atoi(v.Get("limit"))
-		page, _ := strconv.Atoi(v.Get("page"))
+		/* 	limit, _ := strconv.Atoi(v.Get("limit"))
+		page, _ := strconv.Atoi(v.Get("page")) */
 
 		// Aqui aplicamos el Counter que hicimos despues de todo esto
-		count, err := s.Count(filters)
+		count, err := s.Count(ctx, filters)
 		if err != nil {
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(&Response{Status: 500, Err: err.Error()})
-			return
+			return nil, response.InternalServerError(err.Error())
 		}
 		// Nos traemos el Package de Meta de la función New del propio package
-		meta, err := meta.New(page, limit, count, config.LimPageDef) // Le debemos pasar tanto Page & Limit
+		meta, err := meta.New(req.Page, req.Limit, count, config.LimPageDef) // Le debemos pasar tanto Page & Limit
+
 		if err != nil {
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(&Response{Status: 500, Err: err.Error()})
-			return
+			return nil, response.InternalServerError(err.Error())
+
 		}
 
 		// Debemos hacer referencia al GetAll del Service
-		users, err := s.GetAll(filters, meta.Offset(), meta.Limit()) // Pasamos el filtro al GetAll del Service. Y tambien el Meta de Offset y Limit
+		users, err := s.GetAll(ctx, filters, meta.Offset(), meta.Limit()) // Pasamos el filtro al GetAll del Service. Y tambien el Meta de Offset y Limit
 
 		// Si el error es != nill, manejamos con el w.WirteHeader la Bad Request
 		if err != nil {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: err.Error()})
-			return
+			return nil, response.InternalServerError(err.Error())
+
 		}
 		// Lo devolvemos con la nueva struct de Response & Devolvemos el package de Meta (previamente traido arriba)
-		json.NewEncoder(w).Encode(&Response{Status: 200, Data: users, Meta: meta})
+		return response.OK("success", users, nil), nil
 	}
 }
 
 // Get by id endpoint
 func makeGetEndpoint(s Service) Controller {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
 
 		// Se debe crear una variable y guardar el ID como parametro
 
 		//Gorilla Max con Vars le pasamos nuestra request, y esta nos devuelve un path con los parametros
-		path := mux.Vars(r)    // Aqui llamamos a mux (Gorilla Mux),Vars(r) / La r es el http.Request como parametro que tenemos
-		id := path["id"]       // Especificamos que queremos el ID
-		user, err := s.Get(id) // Declaramos al user, y llamamos al service ( s.Get() )
+		// path := mux.Vars(r)    // Aqui llamamos a mux (Gorilla Mux),Vars(r) / La r es el http.Request como parametro que tenemos
+		// id := path["id"]       // Especificamos que queremos el ID
+
+		// NUEVO: Hay que hacer un Request de la Capa anterior de los Request
+		req := request.(GetReq)
+
+		user, err := s.Get(ctx, req.ID) // Declaramos al user, y llamamos al service ( s.Get() )
 
 		if err != nil {
-			w.WriteHeader(404)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "Usuario no encontrado"})
-			return
+			return nil, response.NotFound(err.Error())
 		}
 
-		json.NewEncoder(w).Encode(&Response{Status: 200, Data: user})
+		return response.OK("success", user, nil), nil
 
 	}
 }
 
 // Update endpoint
 func makeUpdateEndpoint(s Service) Controller {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
 
 		// Llamamos a la struct que creamos previamente
-		var req UpdateReq
+		req := request.(UpdateReq)
 
+		// ESTO SE ENCARGARA EL DECODE
 		// Decodificamos el body y lo validamos
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		/* 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			w.WriteHeader(400)
 			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "Invalid request ofrmat"})
 			return
-		}
+		} */
 
 		// Validamos los campos y si viene vacio
 		if req.FirstName != nil && *req.FirstName == "" {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "First name is required"})
-			return
+			return nil, response.BadRequest("First Name is required")
 		}
 
 		if req.LastName != nil && *req.LastName == "" {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "Last name is required"})
-			return
+			return nil, response.BadRequest("Last Name is required")
+
 		}
 
 		if req.Email != nil && *req.Email == "" {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "Email is required"})
-			return
+			return nil, response.BadRequest("Email is required")
+
 		}
 
 		if req.Phone != nil && *req.Phone == "" {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "Phone is required"})
-			return
+			return nil, response.BadRequest("Phone is required")
+
 		}
 
+		//ESTO SE ENCARGARA EL HANDLER
 		// Y aca debemos hacer lo del Gorilla Mux
-		path := mux.Vars(r)
-		id := path["id"]
+		/* 		path := mux.Vars(r)
+		   		id := path["id"] */
 
 		// Vamos a returnar la capa de Servicio que tenemos. Pasandole el ID. En este caso sería: s.Update() con el Body que le habiamos pasado.
-		if err := s.Update(id, req.FirstName, req.LastName, req.Email, req.Phone); err != nil {
-			w.WriteHeader(404)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "User dosent exists"})
-			return
+		if err := s.Update(ctx, req.ID, req.FirstName, req.LastName, req.Email, req.Phone); err != nil {
+			return nil, response.NotFound("Usuario no encontrado")
+
 		}
 
-		json.NewEncoder(w).Encode(&Response{Status: 200, Data: "User updated succesfully"})
+		return response.OK("success", nil, nil), nil
+
 	}
 }
