@@ -15,7 +15,7 @@ type Service interface {
 	GetAll(ctx context.Context, filters Filters, offset, limit int) /* Pasamos el Filtrado de params */ ([]domain.User, error) // Get All
 	Get(ctx context.Context, id string) (*domain.User, error)                                                                  // Get by User ID
 	Delete(ctx context.Context, id string) error
-	Update(ctx context.Context, id string, firstName *string, lastName *string, email *string, phone *string) error
+    Update(ctx context.Context, id string, firstName *string, lastName *string, email *string, phone *string) (*domain.User, error) // 👈 Cambia esto
 	Count(ctx context.Context, filters Filters) (int, error)
 }
 
@@ -98,7 +98,7 @@ func (s service) Delete(ctx context.Context, id string) error {
 	return s.repo.Delete(ctx, id)
 }
 
-func (s service) Update(ctx context.Context, id string, firstName *string, lastName *string, email *string, phone *string) error {
+func (s service) Update(ctx context.Context, id string, firstName *string, lastName *string, email *string, phone *string) (*domain.User, error) {
 	return s.repo.Update(ctx, id, firstName, lastName, email, phone)
 }
 

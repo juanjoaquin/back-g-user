@@ -15,7 +15,7 @@ type Repository interface {
 	GetAll(ctx context.Context, filters Filters, offset int, limit int) /* Pasamos el Filtrado */ ([]domain.User, error) // El Get all, nos devuelve un array de usuarios
 	Get(ctx context.Context, id string) (*domain.User, error)                                                            // El Get by ID, nos devuelve un ID, y un puntero de User
 	Delete(ctx context.Context, id string) error
-	Update(ctx context.Context, id string, firstName *string, lastName *string, email *string, phone *string) error
+	Update(ctx context.Context, id string, firstName *string, lastName *string, email *string, phone *string) (*domain.User, error)
 	Count(ctx context.Context, filters Filters) (int, error) // Devuelve la cantidad de registros
 }
 
@@ -142,7 +142,7 @@ func (repo *repo) Delete(ctx context.Context, id string) error {
 
 // Creamos el Metodo UPDATE
 
-func (repo *repo) Update(ctx context.Context, id string, firstName *string, lastName *string, email *string, phone *string) error {
+func (repo *repo) Update(ctx context.Context, id string, firstName *string, lastName *string, email *string, phone *string) (*domain.User, error) {
 	values := make(map[string]interface{})
 
 	if firstName != nil {
@@ -160,22 +160,28 @@ func (repo *repo) Update(ctx context.Context, id string, firstName *string, last
 	if phone != nil {
 		values["phone"] = *phone
 	}
+
 	result := repo.db.WithContext(ctx).Model(&domain.User{}).Where("id = ?", id).Updates(values)
 
 	if result.Error != nil {
 		repo.log.Println(result.Error)
-		return result.Error
+		return nil, result.Error
 	}
 
-	// Esto se usa solo con RESULT. En caso de que venga con Rows = 0. Lanzamos el mensaje del error.
 	if result.RowsAffected == 0 {
 		repo.log.Printf("user %s doesnt exists", id)
-		return ErrUserNotFound{id}
+		return nil, ErrUserNotFound{id}
 	}
 
-	return nil
-}
+	// 👇 NUEVO: Obtén el usuario actualizado
+	var user domain.User
+	if err := repo.db.WithContext(ctx).Where("id = ?", id).First(&user).Error; err != nil {
+		repo.log.Println(err)
+		return nil, err
+	}
 
+	return &user, nil
+}
 // FUNCION PARA EL APLICADO DE FILTROS
 func applyFilters(tx *gorm.DB, filters Filters) *gorm.DB {
 

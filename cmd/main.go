@@ -52,7 +52,8 @@ func main() {
 	// Obtenemos el puerto a traves de la ENV, y no hardcodeado
 	port := os.Getenv("PORT")
 	// Generamos una address
-	address := fmt.Sprintf("127.0.0.1:%s", port)
+	// address := fmt.Sprintf("127.0.0.1:%s", port)
+	address := fmt.Sprintf(":%s", port)
 
 	srv := &http.Server{
 		Handler:      accessControl(handler), // Aqui pasamos la funcion de abajo accessControl que ya devuelve el Handler
