@@ -165,7 +165,7 @@ func makeCreateEndpoint(s Service) Controller {
 			return nil, response.BadRequest(ErrLastNameRequired.Error())
 		}
 
-		user, err := s.Create(ctx, req.FirstName, req.LastName, req.Phone, req.Email) // Le pasamos el Context (ctx)
+		user, err := s.Create(ctx, req.FirstName, req.LastName, req.Email, req.Phone) // Le pasamos el Context (ctx)
 		if err != nil {
 			return nil, response.InternalServerError(err.Error())
 		}
@@ -251,47 +251,31 @@ func makeGetEndpoint(s Service) Controller {
 	}
 }
 
-// Update endpoint
 func makeUpdateEndpoint(s Service) Controller {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 
-		// Llamamos a la struct que creamos previamente
 		req := request.(UpdateReq)
 
-		// ESTO SE ENCARGARA EL DECODE
-		// Decodificamos el body y lo validamos
-		/* 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "Invalid request ofrmat"})
-			return
-		} */
-
-		// Validamos los campos y si viene vacio
+		// Validaciones
 		if req.FirstName != nil && *req.FirstName == "" {
 			return nil, response.BadRequest(ErrFirstNameRequired.Error())
 		}
 
 		if req.LastName != nil && *req.LastName == "" {
 			return nil, response.BadRequest(ErrLastNameRequired.Error())
-
 		}
 
-		//ESTO SE ENCARGARA EL HANDLER
-		// Y aca debemos hacer lo del Gorilla Mux
-		/* 		path := mux.Vars(r)
-		   		id := path["id"] */
-
-		err := s.Update(ctx, req.ID, req.FirstName, req.LastName, req.Email, req.Phone)
-		// Vamos a returnar la capa de Servicio que tenemos. Pasandole el ID. En este caso sería: s.Update() con el Body que le habiamos pasado.
+		// 👇 NUEVO: Recibe el usuario actualizado
+		user, err := s.Update(ctx, req.ID, req.FirstName, req.LastName, req.Email, req.Phone)
 		if err != nil {
-
 			if errors.As(err, &ErrUserNotFound{}) {
 				return nil, response.NotFound(err.Error())
 			}
 			return nil, response.InternalServerError(err.Error())
 		}
 
-		return response.OK("success", nil, nil), nil
-
+		// 👇 NUEVO: Devuelve el usuario en data
+		return response.OK("success", user, nil), nil
 	}
 }
+
